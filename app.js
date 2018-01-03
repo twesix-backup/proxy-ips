@@ -108,18 +108,19 @@ const cnProxy = async function()
 const checkAlive = async function()
 {
     let num = 0
-    for(let proxy in proxyList)
+    for(let address in proxyList)
     {
         num ++
         (async function()
         {
-            await addProxy
-            (
+            const _proxy =
                 {
-                    address: proxy,
-                    type: proxyList[proxy]
+                    address: address,
+                    type: proxyList[address]
                 }
-            )
+            const proxy = JSON.parse(JSON.stringify(_proxy))
+            delete proxyList[address]
+            await addProxy(proxy)
         })()
     }
     proxyNum = num
@@ -132,7 +133,7 @@ const checkAlive = async function()
     {
         await loadDB()
         await cnProxy()
-        await guobanjia()
+        // await guobanjia()
         await checkAlive()
     }
     catch(e)
@@ -146,7 +147,7 @@ const _updateProxyList = setInterval(async function()
     try
     {
         await cnProxy()
-        await guobanjia()
+        // await guobanjia()
     }
     catch(e)
     {
@@ -168,7 +169,7 @@ const saveIps = function(e)
     {
         fs.writeFileSync('./db.json', JSON.stringify(proxyList))
         process.exit(0)
-    }, 1000 * 10)
+    }, 0)
 }
 
 process.on('uncaughtException', saveIps)
