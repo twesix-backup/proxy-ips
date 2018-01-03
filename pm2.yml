@@ -1,0 +1,3 @@
+- script: /web/bed/proxy-ips/app.js
+  watch: false
+  name: proxy-ips
