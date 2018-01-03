@@ -1,5 +1,6 @@
 const fs = require('fs')
 const request = require('request')
+const crawler = require('./lib/crawler')
 
 const url = 'http://webapi.http.zhimacangku.com/getip?num=25&type=2&pro=&city=0&yys=0&port=1&time=1&ts=1&ys=1&cs=1&lb=1&sb=0&pb=45&mr=2&regions='
 
@@ -31,62 +32,115 @@ const get = function(url, proxy)
     })
 }
 
-const ips = {}
+const proxyList = {}
+let proxyNum = 0
 
-const addIp = async function(proxy, type)
+const addIp = async function(proxy)
 {
     try
     {
-        await isAlive(`${type}://${proxy}`)
-        ips[proxy] = type
+        await isAlive(`${proxy.type}://${proxy.address}`)
+        proxyList[proxy.address] = proxy.type
+    }
+    catch(e)
+    {
+        // console.log(e)
+    }
+}
+
+const loadDB = async function()
+{
+    try
+    {
+        console.log(`[init] reading ip list from db.json`)
+        const db = JSON.parse(fs.readFileSync('./db.json').toString())
+        console.log(db)
+        for(let proxy in db)
+        {
+            (async function()
+            {
+                await addIp
+                (
+                    {
+                        address: proxy,
+                        type: db[proxy]
+                    }
+                )
+            })()
+        }
     }
     catch(e)
     {
         console.log(e)
     }
-}
-try
+};
+
+
+// crawler.guobanjia(function(proxy)
+// {
+//     proxy.forEach(async function(e)
+//     {
+//         await addIp(e.proxy, e.type)
+//     })
+// })
+
+const cnProxy = async function()
 {
-    console.log(`[init] reading ip list from db.json`)
-    const db = JSON.parse(fs.readFileSync('./db1.json').toString())
-    console.log(db)
-    for(let proxy in db)
+    const result = await crawler.cnProxy()
+    result.forEach(async function(proxy)
     {
+        await addIp(proxy)
+    })
+};
+
+const checkAlive = async function()
+{
+    let num = 0
+    for(let proxy in proxyList)
+    {
+        num ++
         (async function()
         {
-            await addIp(proxy, db[proxy])
+            await addIp
+            (
+                {
+                    address: proxy,
+                    type: proxyList[proxy]
+                }
+            )
         })()
     }
-}
-catch(e)
+    proxyNum = num
+    console.log(`[checkAlive] current alive proxy : ${num}`)
+};
+
+(async function()
+{
+    await loadDB()
+    await cnProxy()
+    await checkAlive()
+})()
+
+const _updateProxyList = setInterval(async function()
+{
+    await cnProxy()
+}, 1000 * 120)
+
+const _checkAlive = setInterval(async function()
+{
+    await checkAlive()
+}, 1000 * 60)
+
+const saveIps = function(e)
 {
     console.log(e)
-}
-
-// const watchNumbers = setInterval(async function()
-// {
-//     if(ips.length < 50)
-//     {
-//         console.log('[interval] getting more ip')
-//
-//         const result = JSON.parse(await get(url))
-//         result.data.forEach(async function(e)
-//         {
-//
-//         })
-//     }
-// }, 1000 * 60)
-//
-// const checkAlive = setInterval(async function()
-// {
-//     await addIp(ips.pop())
-// }, 1000)
-
-const saveIps = function()
-{
     console.log('[saveIps] writing ip list back to db.json')
-    console.log(ips)
-    fs.writeFileSync('./db.json', JSON.stringify(ips))
+    console.log(proxyList)
+    fs.writeFileSync('./db.json', JSON.stringify(proxyList))
+    process.exit(0)
 }
+
 process.on('uncaughtException', saveIps)
 process.on('exit', saveIps)
+process.on('SIGINT', saveIps)
+process.on('SIGTERM', saveIps)
