@@ -35,7 +35,7 @@ const get = function(url, proxy)
 const proxyList = {}
 let proxyNum = 0
 
-const addIp = async function(proxy)
+const addProxy = async function(proxy)
 {
     try
     {
@@ -45,6 +45,7 @@ const addIp = async function(proxy)
     catch(e)
     {
         // console.log(e)
+        console.log(`[isAlive] proxy ${`${proxy.type}://${proxy.address}`} is dead`)
     }
 }
 
@@ -53,13 +54,13 @@ const loadDB = async function()
     try
     {
         console.log(`[init] reading ip list from db.json`)
-        const db = JSON.parse(fs.readFileSync('./db.json').toString())
+        const db = JSON.parse(fs.readFileSync('./db1.json').toString())
         console.log(db)
         for(let proxy in db)
         {
             (async function()
             {
-                await addIp
+                await addProxy
                 (
                     {
                         address: proxy,
@@ -76,21 +77,32 @@ const loadDB = async function()
 };
 
 
-// crawler.guobanjia(function(proxy)
-// {
-//     proxy.forEach(async function(e)
-//     {
-//         await addIp(e.proxy, e.type)
-//     })
-// })
+const guobanjia = async function()
+{
+    await crawler.guobanjia(function(list)
+    {
+        list.forEach(async function(proxy)
+        {
+            await addProxy(proxy)
+        })
+    })
+}
+
 
 const cnProxy = async function()
 {
-    const result = await crawler.cnProxy()
-    result.forEach(async function(proxy)
+    try
     {
-        await addIp(proxy)
-    })
+        const result = await crawler.cnProxy()
+        result.forEach(async function(proxy)
+        {
+            await addProxy(proxy)
+        })
+    }
+    catch(e)
+    {
+        console.log(e)
+    }
 };
 
 const checkAlive = async function()
@@ -101,7 +113,7 @@ const checkAlive = async function()
         num ++
         (async function()
         {
-            await addIp
+            await addProxy
             (
                 {
                     address: proxy,
@@ -116,14 +128,30 @@ const checkAlive = async function()
 
 (async function()
 {
-    await loadDB()
-    await cnProxy()
-    await checkAlive()
+    try
+    {
+        await loadDB()
+        await cnProxy()
+        await guobanjia()
+        await checkAlive()
+    }
+    catch(e)
+    {
+        console.log(e)
+    }
 })()
 
 const _updateProxyList = setInterval(async function()
 {
-    await cnProxy()
+    try
+    {
+        await cnProxy()
+        await guobanjia()
+    }
+    catch(e)
+    {
+        console.log(e)
+    }
 }, 1000 * 120)
 
 const _checkAlive = setInterval(async function()
@@ -136,8 +164,11 @@ const saveIps = function(e)
     console.log(e)
     console.log('[saveIps] writing ip list back to db.json')
     console.log(proxyList)
-    fs.writeFileSync('./db.json', JSON.stringify(proxyList))
-    process.exit(0)
+    setTimeout(function()
+    {
+        fs.writeFileSync('./db.json', JSON.stringify(proxyList))
+        process.exit(0)
+    }, 1000 * 10)
 }
 
 process.on('uncaughtException', saveIps)
